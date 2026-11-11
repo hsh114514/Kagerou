@@ -1,0 +1,32 @@
+# Android / Gradle
+app/.gradle/
+app/.idea/
+app/.kotlin/
+app/local.properties
+app/build/
+app/app/build/
+app/captures/
+app/app/release/
+*.hprof
+
+# PoC build output
+poc/ghostlock
+poc/*.o
+
+# Kernel module build output
+kernel/**/*.o
+kernel/**/*.ko
+kernel/**/*.cmd
+kernel/**/*.mod
+kernel/**/*.mod.c
+kernel/**/.tmp_versions/
+kernel/Module.symvers
+kernel/modules.order
+
+# Editor / tooling state
+.mimosa/
+.idea/
+.vscode/
+.gradle/
+*.iml
+.DS_Store

@@ -100,7 +100,9 @@ cd ksun && git apply /path/to/kernel/r5g-4.19.patch
 
 # WSL 里对着内核树编译（改 build_wsl.sh 顶部的 SRC/OUT）
 SRC=/path/to/msm-4.19 ./build_wsl.sh
-python3 gen_app_syms.py            # 生成 app 的 ksu_syms.tsv
+# 生成 app 的 ksu_syms.tsv（走 stdout，重定向到 asset）
+python3 gen_app_syms.py kernel/kernelsu.ko ksu-syms.txt \
+        > ../app/app/src/main/assets/ksu_syms.tsv
 ```
 
 ### App

@@ -3,26 +3,19 @@
 
 Only symbols the module actually imports are kept, so the asset stays tiny
 instead of shipping the whole 128k-entry kernel symbol list.
+
+Usage:
+  gen_app_syms.py <kernelsu.ko> <syms> > app/app/src/main/assets/ksu_syms.tsv
+
+The table goes to stdout and the diagnostics to stderr, so the tool has no
+output path of its own: redirect it at the asset you want to update.
 """
-import pathlib
 import struct
 import sys
 
 SHT_SYMTAB = 2
 SHT_STRTAB = 3
 SHN_UNDEF = 0
-
-# The generated table is an app asset and nothing else; refusing any other
-# destination keeps an argv typo (or a "../" path) from writing outside it.
-ASSETS = (pathlib.Path(__file__).resolve().parent
-          / "app" / "app" / "src" / "main" / "assets")
-
-
-def asset_path(arg):
-    p = pathlib.Path(arg).resolve()
-    if p.parent != ASSETS.resolve():
-        raise SystemExit("output must be inside %s" % ASSETS)
-    return p
 
 
 def parse(path):
@@ -60,10 +53,9 @@ def parse(path):
 
 
 def main():
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: gen_app_syms.py <kernelsu.ko> <syms> <assets/ksu_syms.tsv>")
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: gen_app_syms.py <kernelsu.ko> <syms>")
     ko, syms_file = sys.argv[1], sys.argv[2]
-    out = asset_path(sys.argv[3])
     undef = parse(ko)
 
     table = {}
@@ -77,17 +69,16 @@ def main():
                     pass
 
     missing = [n for n in undef if n not in table]
-    with open(out, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# symbol offset(text-relative hex) -- generated\n")
-        for name in undef:
-            if name in table:
-                f.write("%s %x\n" % (name, table[name]))
+    lines = ["# symbol offset(text-relative hex) -- generated\n"]
+    for name in undef:
+        if name in table:
+            lines.append("%s %x\n" % (name, table[name]))
+    sys.stdout.buffer.write("".join(lines).encode("utf-8"))
 
     print("imports=%d resolved=%d missing=%d" %
-          (len(undef), len(undef) - len(missing), len(missing)))
+          (len(undef), len(undef) - len(missing), len(missing)), file=sys.stderr)
     if missing:
-        print("missing:", " ".join(missing[:20]))
-    print("wrote", out)
+        print("missing:", " ".join(missing[:20]), file=sys.stderr)
 
 
 if __name__ == "__main__":

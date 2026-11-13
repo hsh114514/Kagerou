@@ -1,0 +1,4 @@
+# These two are consumed by the device, not by a Windows editor: a CRLF
+# checkout would put \r into the shell script and break the patch file.
+*.sh    text eol=lf
+*.patch text eol=lf

@@ -29,4 +29,6 @@ kernel/modules.order
 .vscode/
 .gradle/
 *.iml
+__pycache__/
+*.pyc
 .DS_Store

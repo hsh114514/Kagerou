@@ -15,6 +15,7 @@
 #include <linux/compiler_types.h>
 #include <linux/hashtable.h>
 #include <linux/kref.h>
+#include <linux/workqueue.h>
 
 #include "klog.h" // IWYU pragma: keep
 #include "ksu.h"
@@ -412,7 +413,6 @@ bool ksu_get_allow_list(int *array, u16 length, u16 *out_length, u16 *out_total,
 	return true;
 }
 
-// TODO: move to kernel thread or work queue
 static void do_persistent_allow_list(struct callback_head *_cb)
 {
     u32 magic = FILE_MAGIC;
@@ -420,6 +420,15 @@ static void do_persistent_allow_list(struct callback_head *_cb)
     struct perm_data *p = NULL;
     loff_t off = 0;
     int i;
+
+    /*
+     * Late load: ksu_cred was cloned before userspace injected the ksu
+     * domain, so it may still carry u:r:kernel:s0.  Once enforcing is back
+     * on, opening anything under /data/adb with those creds fails with
+     * EACCES (and the allowlist never reaches the disk).  The policy has
+     * been patched by now, so retry the transition before writing.
+     */
+    setup_ksu_cred();
 
     const struct cred *saved = override_creds(ksu_cred);
     struct file *fp =
@@ -456,33 +465,26 @@ out:
     kfree(_cb);
 }
 
+/*
+ * The write used to be queued on init as a task_work item.  On 4.19
+ * task_work_add(..., true) only kicks the CPU the target sits on; a task
+ * parked in epoll_wait -- which is exactly what Android's init does once
+ * boot is over -- is never woken, so the pending write stayed queued for
+ * the rest of the uptime and the superuser list was never persisted.
+ *
+ * A workqueue item runs in a kworker: always runnable, and it keeps the
+ * init mount namespace (the reason pid 1 was used in the first place).
+ */
+static struct work_struct allow_list_work;
+
+static void do_persistent_allow_list_work(struct work_struct *work)
+{
+	do_persistent_allow_list(NULL);
+}
+
 void ksu_persistent_allow_list()
 {
-	struct task_struct *tsk;
-
-	rcu_read_lock();
-	tsk = get_pid_task(find_vpid(1), PIDTYPE_PID);
-	if (!tsk) {
-		rcu_read_unlock();
-		pr_err("save_allow_list find init task err\n");
-		return;
-	}
-	rcu_read_unlock();
-
-	struct callback_head *cb =
-		kzalloc(sizeof(struct callback_head), GFP_KERNEL);
-	if (!cb) {
-		pr_err("save_allow_list alloc cb err\b");
-		goto put_task;
-	}
-	cb->func = do_persistent_allow_list;
-	if (task_work_add(tsk, cb, TWA_RESUME)) {
-		kfree(cb);
-		pr_warn("save_allow_list add task_work failed\n");
-	}
-
-put_task:
-	put_task_struct(tsk);
+	schedule_work(&allow_list_work);
 }
 
 static void migrate_profile(u32 version, struct app_profile *profile)
@@ -618,6 +620,7 @@ void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *),
 
 void __init ksu_allowlist_init(void)
 {
+	INIT_WORK(&allow_list_work, do_persistent_allow_list_work);
 	init_default_profiles();
 }
 

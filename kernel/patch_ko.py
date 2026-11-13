@@ -12,9 +12,12 @@ local definition and relocates the instruction directly -- no export table,
 no CRC checks.
 
 Usage:
-  patch_ko.py <in.ko> <out.ko> <kbase-hex> <syms-file>
+  patch_ko.py <in.ko> <kbase-hex> <syms-file> > <out.ko>
 
 syms-file lines: "<name> <offset-in-hex-from-_text>"
+
+The patched module goes to stdout, diagnostics to stderr, so there is no
+output path to sanitise: redirect wherever you want it.
 """
 import struct
 import sys
@@ -37,16 +40,16 @@ def load_syms(path):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print(__doc__)
+    if len(sys.argv) != 4:
+        print(__doc__, file=sys.stderr)
         return 1
-    src, dst, kbase_s, syms_path = sys.argv[1:5]
+    src, kbase_s, syms_path = sys.argv[1:4]
     kbase = int(kbase_s, 16)
     syms = load_syms(syms_path)
 
     data = bytearray(open(src, "rb").read())
     if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
-        print("not a little-endian ELF64")
+        print("not a little-endian ELF64", file=sys.stderr)
         return 1
 
     e_shoff, = struct.unpack_from("<Q", data, 0x28)
@@ -83,14 +86,15 @@ def main():
             struct.pack_into("<Q", data, soff + 8, val)
             patched.append((name, val))
 
-    open(dst, "wb").write(data)
-    print("patched %d symbols (kbase=%#x)" % (len(patched), kbase))
+    sys.stdout.buffer.write(data)
+    print("patched %d symbols (kbase=%#x)" % (len(patched), kbase),
+          file=sys.stderr)
     for name, val in patched:
-        print("  %-38s %#x" % (name, val))
+        print("  %-38s %#x" % (name, val), file=sys.stderr)
     if unresolved:
-        print("UNRESOLVED (must be provided by the module):")
+        print("UNRESOLVED (must be provided by the module):", file=sys.stderr)
         for n in sorted(set(unresolved)):
-            print("  " + n)
+            print("  " + n, file=sys.stderr)
     return 0
 
 

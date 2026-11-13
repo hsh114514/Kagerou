@@ -21,6 +21,10 @@ DIR=$(dirname "$0")
 # through the policy patch and leave SELinux permissive.
 trap '' PIPE
 
+# The kernel persists the superuser list to /data/adb/ksu/.allowlist but never
+# creates the directory, so make sure a fresh install has one.
+mkdir -p /data/adb/ksu
+
 insmod "$DIR/kernelsu_r5g.ko" allow_shell=1
 echo "insmod rc=$?"
 

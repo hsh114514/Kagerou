@@ -18,6 +18,7 @@ __rcu_read_lock e2248
 __ll_sc_atomic64_add 13bb5d8
 kallsyms_lookup 117bd0
 snprintf 13d0320
+queue_work_on 5e9f0
 flex_array_put 4d5550
 avtab_destroy 428388
 selnl_notify_policyload 424a80
@@ -168,7 +169,6 @@ __warn_printk 3da38
 selinux_status_update_policyload 436698
 __arch_copy_from_user 13bbec0
 commit_creds 6bf18
-find_vpid 65cb8
 free_uid 4e9c8
 get_random_bytes 66d0b0
 kfree_call_rcu e02e8
@@ -195,5 +195,6 @@ set_groups 6ed88
 kmalloc_caches 1f4f080
 avc_ss_reset 414e28
 kernel_write 22e2d0
+system_wq 278db28
 d_path 2743f8
 selinux_state 31b6000
